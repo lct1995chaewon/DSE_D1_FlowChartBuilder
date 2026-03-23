@@ -28,16 +28,7 @@
 
 ## 🚀 快速開始
 
-### 方法一：直接在瀏覽器運行（推薦）
-1.  從本倉庫下載 `index.html` (或主文件名稱)。
-2.  雙擊文件，使用 Chrome / Edge / Firefox / Safari 打開。
-3.  點擊右上角的 **📖 示範例子** 開始體驗！
-
-### 方法二：GitHub Pages 部署
-1.  Fork 本倉庫。
-2.  進入倉庫設定 (Settings) > Pages。
-3.  選擇 `main` 分支並保存。
-4.  幾分鐘後，你將獲得一個可公開訪問的線上網址。
+ https://lct1995chaewon.github.io/DSE_D1_FlowChartBuilder/
 
 ---
 
