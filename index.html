@@ -16,7 +16,11 @@ body{font-family:'Microsoft JhengHei','PingFang TC',sans-serif;overflow:hidden;h
 .toolbar .ab:hover{background:#e94560;}
 .toolbar .rb{background:#00b894;color:#fff;}
 .toolbar .rb:hover{background:#00cec9;}
+.toolbar .fb{background:#0984e3;color:#fff;}
+.toolbar .fb:hover{background:#74b9ff;}
 .toolbar .sep{width:1px;height:24px;background:#533483;margin:0 2px;}
+.toolbar .file-label{padding:5px 10px;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:500;transition:all 0.2s;white-space:nowrap;background:#0984e3;color:#fff;display:inline-block;}
+.toolbar .file-label:hover{background:#74b9ff;}
 .help{font-size:11px;color:#8b949e;padding:3px 12px;background:#0d1117;text-align:center;line-height:1.5;}
 .main{display:flex;flex:1;overflow:hidden;}
 .cc{flex:1;position:relative;overflow:auto;background:#1a1a2e;background-image:radial-gradient(circle,#2a2a4a 1px,transparent 1px);background-size:20px 20px;}
@@ -83,8 +87,11 @@ svg.conns{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:n
 <button class="ab" id="btnReset">🔄 重置</button>
 <button class="ab" id="btnClear">🧹 清空</button>
 <button class="ab" id="btnDemo">📖 示範例子</button>
+<div class="sep"></div>
+<button class="fb" id="btnSave">💾 儲存</button>
+<label class="file-label">📂 讀取<input type="file" id="fileInput" accept=".json,.flow" style="display:none;"></label>
 </div>
-<div class="help">💡 選擇節點類型後點擊畫布放置 | 雙擊編輯內容 | 從連接埠(小圓點)拖到另一節點的連接埠建立連線 | 處理: x = 表達式 | 輸入: 輸入 x | 輸出: 輸出 x | 判斷: x &gt; 0</div>
+<div class="help">💡 選擇節點類型後點擊畫布放置 | 雙擊編輯內容 | 從連接埠拖到另一節點建立連線 | 💾 儲存/📂 讀取可保存及載入你的流程圖</div>
 <div class="main">
 <div class="cc" id="cc">
 <div id="canvas">
@@ -117,8 +124,10 @@ pConn=false;pFrom=null;
 document.getElementById('btnRun').onclick=()=>runFlow(false);
 document.getElementById('btnStep').onclick=()=>doStep();
 document.getElementById('btnReset').onclick=resetExec;
-document.getElementById('btnClear').onclick=clearAll;
+document.getElementById('btnClear').onclick=()=>{showConfirm('🧹 清空畫布','確定要清空所有節點和連線嗎？',ok=>{if(ok)clearAll();});};
 document.getElementById('btnDemo').onclick=showDemoMenu;
+document.getElementById('btnSave').onclick=saveFlow;
+document.getElementById('fileInput').addEventListener('change',loadFlow);
 
 document.getElementById('canvas').addEventListener('mousedown',function(e){
 if(e.target!==this&&!e.target.closest('svg.conns'))return;
@@ -312,12 +321,84 @@ document.getElementById('cyes').onclick=()=>{mc.innerHTML='';cb('是');};
 document.getElementById('cno').onclick=()=>{mc.innerHTML='';cb('否');};
 }
 
+function showConfirm(title,msg,cb){
+const mc=document.getElementById('mc');
+mc.innerHTML='<div class="mo"><div class="md"><h3>'+esc(title)+'</h3><p>'+esc(msg)+'</p><div class="mb"><button class="bca" id="cfNo">取消</button><button class="bok" id="cfYes">確定</button></div></div></div>';
+document.getElementById('cfYes').onclick=()=>{mc.innerHTML='';cb(true);};
+document.getElementById('cfNo').onclick=()=>{mc.innerHTML='';cb(false);};
+}
+
+function showNotice(title,msg){
+const mc=document.getElementById('mc');
+mc.innerHTML='<div class="mo"><div class="md"><h3>'+esc(title)+'</h3><p>'+esc(msg)+'</p><div class="mb"><button class="bok" id="ntOk">確定</button></div></div></div>';
+document.getElementById('ntOk').onclick=()=>{mc.innerHTML='';};
+}
+
 function showInput(prompt,cb){
 const mc=document.getElementById('mc');
 mc.innerHTML='<div class="mo"><div class="md"><h3>📥 輸入</h3><p>'+esc(prompt)+'</p><input type="text" id="ri"><div class="mb"><button class="bok" id="riok">確定</button></div></div></div>';
 const inp=document.getElementById('ri');setTimeout(()=>inp.focus(),50);
 inp.onkeydown=e=>{if(e.key==='Enter'){const v=inp.value;mc.innerHTML='';cb(v);}};
 document.getElementById('riok').onclick=()=>{const v=inp.value;mc.innerHTML='';cb(v);};
+}
+
+/* === 儲存功能 === */
+function saveFlow(){
+if(nodes.length===0){showNotice('💾 儲存','畫布是空的，沒有東西可以儲存！');return;}
+const data={
+app:'FlowLearn',
+version:'1.0',
+timestamp:new Date().toISOString(),
+nid:nid,
+nodes:nodes.map(n=>({id:n.id,type:n.type,x:Math.round(n.x),y:Math.round(n.y),text:n.text})),
+conns:conns.map(c=>({id:c.id,f:c.f,t:c.t,fp:c.fp,tp:c.tp,lb:c.lb}))
+};
+const jsonStr=JSON.stringify(data,null,2);
+const blob=new Blob([jsonStr],{type:'application/json'});
+const url=URL.createObjectURL(blob);
+const a=document.createElement('a');
+a.href=url;
+const now=new Date();
+const fn='FlowLearn_'+now.getFullYear()+('0'+(now.getMonth()+1)).slice(-2)+('0'+now.getDate()).slice(-2)+'_'+('0'+now.getHours()).slice(-2)+('0'+now.getMinutes()).slice(-2)+'.json';
+a.download=fn;
+document.body.appendChild(a);
+a.click();
+document.body.removeChild(a);
+URL.revokeObjectURL(url);
+logC('💾 已儲存為 '+fn,'success');
+}
+
+/* === 讀取功能 === */
+function loadFlow(e){
+const file=e.target.files[0];
+if(!file)return;
+const doLoad=()=>{
+const reader=new FileReader();
+reader.onload=function(ev){
+try{
+const data=JSON.parse(ev.target.result);
+if(!data.nodes||!Array.isArray(data.nodes)){throw new Error('格式錯誤');}
+clearAllSilent();
+nid=data.nid||1;
+nodes=data.nodes;
+conns=(data.conns||[]).map(c=>({id:c.id,f:c.f,t:c.t,fp:c.fp,tp:c.tp,lb:c.lb||'',hl:false}));
+let maxId=0;
+nodes.forEach(n=>{if(n.id>maxId)maxId=n.id;renderNode(n);});
+conns.forEach(c=>{if(c.id>maxId)maxId=c.id;});
+if(nid<=maxId)nid=maxId+1;
+setTimeout(updConns,50);
+logC('📂 已載入檔案：'+file.name+' ('+nodes.length+' 個節點, '+conns.length+' 條連線)','success');
+}catch(err){
+logC('❌ 載入失敗：'+err.message,'error');
+showNotice('❌ 載入失敗','無法讀取此檔案。請確保檔案是由 FlowLearn 儲存的 .json 文件。\n\n錯誤：'+err.message);
+}
+};
+reader.readAsText(file);
+};
+e.target.value='';
+if(nodes.length>0){
+showConfirm('📂 載入檔案','目前畫布上有內容，載入新檔案將會覆蓋。\n確定要繼續嗎？',ok=>{if(ok)doLoad();});
+}else{doLoad();}
 }
 
 /* === Demo Menu === */
@@ -348,17 +429,13 @@ vp.innerHTML=ks.map(k=>'<div class="vi"><span class="vn">'+esc(k)+'</span><span 
 function hlNode(id){document.querySelectorAll('.flow-node').forEach(e=>e.classList.remove('node-highlight'));if(id){const e=document.querySelector('.flow-node[data-id="'+id+'"]');if(e)e.classList.add('node-highlight');}}
 function clrHL(){document.querySelectorAll('.flow-node').forEach(e=>e.classList.remove('node-highlight'));conns.forEach(c=>c.hl=false);updConns();}
 
-/* ===== 修正後的 safeEval ===== */
 function safeEval(expr,vars){
 let p=expr.trim();
 if(p.startsWith('"')&&p.endsWith('"'))return p.slice(1,-1);
 if(p.startsWith("'")&&p.endsWith("'"))return p.slice(1,-1);
-// 全形符號轉換
 p=p.replace(/＝＝/g,'==').replace(/！＝/g,'!=').replace(/＞＝/g,'>=').replace(/＜＝/g,'<=').replace(/＞/g,'>').replace(/＜/g,'<');
-// 中文邏輯詞（不會出現在英文變數名中，直接替換即可）
 p=p.replace(/不等於/g,'!=').replace(/等於/g,'==').replace(/大於/g,'>').replace(/小於/g,'<');
 p=p.replace(/及/g,'&&').replace(/和/g,'&&').replace(/或/g,'||');
-// 英文關鍵字用 \b word boundary，避免誤傷變數名如 score, model, android 等
 p=p.replace(/\bAND\b/gi,'&&').replace(/\bOR\b/gi,'||').replace(/\bMOD\b/gi,'%');
 const vn=Object.keys(vars),vv=Object.values(vars);
 try{return new Function(...vn,'return('+p+');')(...vv);}
@@ -455,6 +532,15 @@ ex={run:false,step:false,vars:{},cur:null};stepR=null;
 clrHL();clrC();updVars();document.getElementById('mc').innerHTML='';
 }
 
+function clearAllSilent(){
+ex={run:false,step:false,vars:{},cur:null};stepR=null;
+clrHL();
+document.querySelectorAll('.flow-node').forEach(e=>e.remove());
+nodes=[];conns=[];
+updConns();selNode=null;updProp();
+document.getElementById('mc').innerHTML='';
+}
+
 function clearAll(){
 resetExec();nodes=[];conns=[];
 document.querySelectorAll('.flow-node').forEach(e=>e.remove());
@@ -474,7 +560,6 @@ default:loadDemoSequence();
 setTimeout(updConns,50);
 }
 
-// 示範1：序列 — 計算矩形面積
 function loadDemoSequence(){
 const s=mkNode('start',280,20);
 const i1=mkNode('input',260,110);setTxt(i1,'輸入 length');
@@ -493,7 +578,6 @@ logC('這是最基本的「序列」結構：所有步驟按順序執行，沒�
 logC('按「▶ 執行」，輸入長度和寬度即可計算面積。','info');
 }
 
-// 示範2：IF（單分支）— 及格檢查
 function loadDemoIf(){
 const s=mkNode('start',280,20);
 const i1=mkNode('input',260,110);setTxt(i1,'輸入 score');
@@ -511,7 +595,6 @@ logC('這是「IF」結構：條件成立時才執行某動作，否則跳過。
 logC('試試輸入 60（應顯示「及格」）或 40（直接結束，無輸出）。','info');
 }
 
-// 示範3：IF-ELSE（雙分支）— 帶傘判斷
 function loadDemoIfElse(){
 const s=mkNode('start',300,20);
 const i1=mkNode('input',275,110);setTxt(i1,'輸入 rain');
@@ -531,7 +614,6 @@ logC('這是「IF-ELSE」結構：條件成立走一邊，不成立走另一邊�
 logC('輸入 1 代表有雨（顯示「請帶傘」），輸入 0 代表無雨（顯示「不用帶傘」）。','info');
 }
 
-// 示範4：迴圈 — 計算 1+2+...+n
 function loadDemoLoop(){
 const s=mkNode('start',280,20);
 const i1=mkNode('input',270,110);setTxt(i1,'輸入 n');
