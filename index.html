@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FlowLearn 流程圖學習工具</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Microsoft JhengHei','PingFang TC',sans-serif;overflow:hidden;height:100vh;display:flex;flex-direction:column;background:#1a1a2e;color:#eee;}
+.toolbar{display:flex;align-items:center;gap:6px;padding:6px 12px;background:#16213e;border-bottom:2px solid #0f3460;flex-wrap:wrap;min-height:44px;}
+.toolbar .title{font-size:17px;font-weight:bold;color:#e94560;margin-right:10px;white-space:nowrap;}
+.toolbar button{padding:5px 10px;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:500;transition:all 0.2s;white-space:nowrap;}
+.toolbar .nb{background:#0f3460;color:#eee;border:1px solid #533483;}
+.toolbar .nb:hover,.toolbar .nb.active{background:#e94560;color:#fff;}
+.toolbar .ab{background:#533483;color:#fff;}
+.toolbar .ab:hover{background:#e94560;}
+.toolbar .rb{background:#00b894;color:#fff;}
+.toolbar .rb:hover{background:#00cec9;}
+.toolbar .sep{width:1px;height:24px;background:#533483;margin:0 2px;}
+.help{font-size:11px;color:#8b949e;padding:3px 12px;background:#0d1117;text-align:center;line-height:1.5;}
+.main{display:flex;flex:1;overflow:hidden;}
+.cc{flex:1;position:relative;overflow:auto;background:#1a1a2e;background-image:radial-gradient(circle,#2a2a4a 1px,transparent 1px);background-size:20px 20px;}
+#canvas{width:3000px;height:2000px;position:relative;}
+svg.conns{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:1;}
+.flow-node{position:absolute;z-index:10;cursor:grab;user-select:none;text-align:center;transition:transform 0.1s;}
+.flow-node.selected .node-shape{outline:3px solid #e94560;outline-offset:2px;}
+.node-shape{display:flex;align-items:center;justify-content:center;padding:10px 18px;font-size:13px;line-height:1.4;word-break:break-word;min-height:44px;color:#fff;transition:filter 0.2s;}
+.node-highlight .node-shape{animation:strong-pulse 0.4s infinite alternate;z-index:20;transform:scale(1.05);}
+@keyframes strong-pulse{from{filter:brightness(1) saturate(1);box-shadow:0 0 5px rgba(255,255,255,0.2);transform:scale(1);}to{filter:brightness(1.6) saturate(1.2);box-shadow:0 0 20px currentColor,0 0 40px rgba(255,255,255,0.4);transform:scale(1.08);}}
+.node-start .node-shape{background:#00b894;border-radius:22px;border:2px solid #00cec9;min-width:100px;}
+.node-end .node-shape{background:#d63031;border-radius:22px;border:2px solid #ff7675;min-width:100px;}
+.node-process .node-shape{background:#0984e3;border:2px solid #74b9ff;border-radius:6px;min-width:120px;}
+.node-input .node-shape{background:#e17055;border:2px solid #fab1a0;border-radius:6px;min-width:120px;clip-path:polygon(10% 0%,100% 0%,90% 100%,0% 100%);padding:10px 28px;}
+.node-output .node-shape{background:#6c5ce7;border:2px solid #a29bfe;border-radius:6px;min-width:120px;clip-path:polygon(10% 0%,100% 0%,90% 100%,0% 100%);padding:10px 28px;}
+.node-decision .node-shape{background:#fdcb6e;color:#2d3436;border:2px solid #ffeaa7;min-width:100px;min-height:70px;clip-path:polygon(50% 0%,100% 50%,50% 100%,0% 50%);padding:20px 30px;}
+.port{position:absolute;width:14px;height:14px;background:#b2bec3;border:2px solid #636e72;border-radius:50%;z-index:15;cursor:crosshair;transition:all 0.15s;}
+.port:hover{background:#e94560;transform:scale(1.4);}
+.port-top{top:-7px;left:50%;margin-left:-7px;}
+.port-bottom{bottom:-7px;left:50%;margin-left:-7px;}
+.port-left{left:-7px;top:50%;margin-top:-7px;}
+.port-right{right:-7px;top:50%;margin-top:-7px;}
+.rp{width:280px;background:#16213e;border-left:2px solid #0f3460;display:flex;flex-direction:column;overflow:hidden;}
+.ps{padding:10px;border-bottom:1px solid #0f3460;}
+.ps h3{font-size:13px;color:#e94560;margin-bottom:6px;}
+.ps textarea,.ps input{width:100%;background:#1a1a2e;border:1px solid #533483;color:#eee;padding:5px 7px;border-radius:4px;font-size:12px;resize:vertical;font-family:inherit;}
+.ps textarea{min-height:50px;}
+.console{flex:1;overflow-y:auto;padding:6px 10px;font-family:'Consolas','Courier New',monospace;font-size:12px;background:#0d1117;}
+.console .l{padding:2px 0;}.console .output{color:#58a6ff;}.console .error{color:#f85149;}.console .info{color:#8b949e;}.console .success{color:#3fb950;}
+.vars{padding:6px 10px;max-height:130px;overflow-y:auto;}
+.vi{display:flex;justify-content:space-between;padding:2px 0;font-size:11px;border-bottom:1px solid #0f3460;}
+.vn{color:#fdcb6e;}.vv{color:#74b9ff;}
+.mo{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:1000;display:flex;align-items:center;justify-content:center;}
+.md{background:#16213e;border:2px solid #533483;border-radius:12px;padding:20px;min-width:300px;max-width:90%;}
+.md h3{color:#e94560;margin-bottom:12px;font-size:15px;}
+.md p{color:#dfe6e9;margin-bottom:10px;font-size:13px;}
+.md input{width:100%;padding:8px;background:#1a1a2e;border:1px solid #533483;color:#eee;border-radius:6px;font-size:14px;margin-bottom:10px;font-family:inherit;}
+.md .mb{display:flex;gap:8px;justify-content:flex-end;}
+.md button{padding:6px 16px;border:none;border-radius:6px;cursor:pointer;font-size:13px;}
+.md .bok{background:#00b894;color:#fff;}.md .bca{background:#636e72;color:#fff;}
+.md .byes{background:#0984e3;color:#fff;}.md .bno{background:#e17055;color:#fff;}
+.demo-btn{display:block;width:100%;text-align:left;padding:10px 14px;margin-bottom:8px;background:#1a1a2e;border:1px solid #533483;border-radius:8px;color:#eee;cursor:pointer;transition:all 0.2s;font-size:13px;}
+.demo-btn:hover{background:#533483;border-color:#e94560;transform:translateX(4px);}
+.demo-btn .dtag{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;margin-right:8px;font-weight:bold;}
+.demo-btn .ddesc{color:#8b949e;font-size:11px;display:block;margin-top:3px;margin-left:2px;}
+@media(max-width:700px){.rp{width:200px;}.toolbar button{padding:4px 7px;font-size:11px;}}
+</style>
+</head>
+<body>
+<div class="toolbar">
+<span class="title">📊 FlowLearn</span>
+<button class="nb" data-tool="start">🟢 開始</button>
+<button class="nb" data-tool="end">🔴 結束</button>
+<button class="nb" data-tool="process">🔷 處理</button>
+<button class="nb" data-tool="input">📥 輸入</button>
+<button class="nb" data-tool="output">📤 輸出</button>
+<button class="nb" data-tool="decision">🔶 判斷</button>
+<div class="sep"></div>
+<button class="nb" data-tool="connect">🔗 連接</button>
+<button class="nb" data-tool="delete">🗑 刪除</button>
+<div class="sep"></div>
+<button class="rb" id="btnRun">▶ 執行</button>
+<button class="rb" id="btnStep" style="background:#6c5ce7">⏭ 逐步</button>
+<button class="ab" id="btnReset">🔄 重置</button>
+<button class="ab" id="btnClear">🧹 清空</button>
+<button class="ab" id="btnDemo">📖 示範例子</button>
+</div>
+<div class="help">💡 選擇節點類型後點擊畫布放置 | 雙擊編輯內容 | 從連接埠(小圓點)拖到另一節點的連接埠建立連線 | 處理: x = 表達式 | 輸入: 輸入 x | 輸出: 輸出 x | 判斷: x &gt; 0</div>
+<div class="main">
+<div class="cc" id="cc">
+<div id="canvas">
+<svg class="conns" id="svg"><defs>
+<marker id="ah" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="#b2bec3"/></marker>
+<marker id="ahh" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="#e94560"/></marker>
+</defs></svg>
+</div>
+</div>
+<div class="rp">
+<div class="ps"><h3>📝 節點屬性</h3><div id="pp"><p style="color:#8b949e;font-size:11px;">點擊節點查看屬性</p></div></div>
+<div class="ps"><h3>📊 變量監察</h3><div class="vars" id="vp"><p style="color:#8b949e;font-size:11px;">執行後顯示</p></div></div>
+<div class="ps" style="flex:1;display:flex;flex-direction:column;overflow:hidden;"><h3>💻 輸出主控台</h3><div class="console" id="con"></div></div>
+</div>
+</div>
+<div id="mc"></div>
+<script>
+let nodes=[],conns=[],nid=1,tool=null,selNode=null,dragging=null,dragOff={x:0,y:0};
+let pConn=false,pFrom=null,pFPort=null;
+let ex={run:false,step:false,vars:{},cur:null},stepR=null;
+
+document.querySelectorAll('.nb').forEach(b=>{
+b.addEventListener('click',()=>{
+const t=b.dataset.tool;
+if(tool===t){tool=null;b.classList.remove('active');}
+else{document.querySelectorAll('.nb').forEach(x=>x.classList.remove('active'));tool=t;b.classList.add('active');}
+pConn=false;pFrom=null;
+});
+});
+document.getElementById('btnRun').onclick=()=>runFlow(false);
+document.getElementById('btnStep').onclick=()=>doStep();
+document.getElementById('btnReset').onclick=resetExec;
+document.getElementById('btnClear').onclick=clearAll;
+document.getElementById('btnDemo').onclick=showDemoMenu;
+
+document.getElementById('canvas').addEventListener('mousedown',function(e){
+if(e.target!==this&&!e.target.closest('svg.conns'))return;
+if(!tool||['connect','delete'].includes(tool))return;
+const r=this.getBoundingClientRect();
+mkNode(tool,e.clientX-r.left-60,e.clientY-r.top-25);
+});
+
+function esc(t){const d=document.createElement('div');d.textContent=t;return d.innerHTML;}
+
+function mkNode(type,x,y){
+const id=nid++;
+let txt='';
+switch(type){case'start':txt='開始';break;case'end':txt='結束';break;case'process':txt='x = 0';break;case'input':txt='輸入 x';break;case'output':txt='輸出 x';break;case'decision':txt='x > 0';break;}
+const n={id,type,x,y,text:txt};nodes.push(n);renderNode(n);selN(id);return n;
+}
+
+function setTxt(n,txt){n.text=txt;const el=document.querySelector('.flow-node[data-id="'+n.id+'"] .node-shape');if(el)el.childNodes[0].textContent=txt;}
+
+function renderNode(n){
+const el=document.createElement('div');
+el.className='flow-node node-'+n.type;
+el.dataset.id=n.id;
+el.style.left=n.x+'px';el.style.top=n.y+'px';
+let ports='';
+if(n.type!=='start')ports+='<div class="port port-top" data-port="top"></div>';
+if(n.type!=='end'){
+if(n.type==='decision'){
+ports+='<div class="port port-left" data-port="left" title="否"></div>';
+ports+='<div class="port port-right" data-port="right" title="是"></div>';
+ports+='<div class="port port-bottom" data-port="bottom"></div>';
+}else{ports+='<div class="port port-bottom" data-port="bottom"></div>';}
+}
+el.innerHTML='<div class="node-shape">'+esc(n.text)+'</div>'+ports;
+el.addEventListener('mousedown',onNDown);
+el.addEventListener('dblclick',onNDbl);
+el.querySelectorAll('.port').forEach(p=>{p.addEventListener('mousedown',onPDown);p.addEventListener('mouseup',onPUp);});
+document.getElementById('canvas').appendChild(el);
+}
+
+function onNDown(e){
+if(e.target.classList.contains('port'))return;
+const el=e.target.closest('.flow-node'),id=+el.dataset.id;
+if(tool==='delete'){delNode(id);return;}
+if(tool==='connect'){
+if(!pFrom){pFrom=id;el.style.opacity='0.6';logC('點擊目標節點完成連接...','info');}
+else if(pFrom!==id){mkConn(pFrom,id,'bottom','top');document.querySelector('.flow-node[data-id="'+pFrom+'"]').style.opacity='1';pFrom=null;}
+return;
+}
+selN(id);dragging=id;
+const n=nodes.find(a=>a.id===id);
+dragOff.x=e.clientX-n.x;dragOff.y=e.clientY-n.y;
+el.style.cursor='grabbing';e.preventDefault();
+}
+document.addEventListener('mousemove',e=>{
+if(!dragging)return;
+const n=nodes.find(a=>a.id===dragging);
+n.x=e.clientX-dragOff.x;n.y=e.clientY-dragOff.y;
+const el=document.querySelector('.flow-node[data-id="'+dragging+'"]');
+el.style.left=n.x+'px';el.style.top=n.y+'px';
+updConns();
+});
+document.addEventListener('mouseup',()=>{
+if(dragging){const el=document.querySelector('.flow-node[data-id="'+dragging+'"]');if(el)el.style.cursor='grab';dragging=null;}
+if(pConn){pConn=false;document.querySelectorAll('.port').forEach(p=>p.style.background='');pFPort=null;pFrom=null;}
+});
+
+function onNDbl(e){
+const el=e.target.closest('.flow-node'),id=+el.dataset.id,n=nodes.find(a=>a.id===id);
+showModal('編輯「'+getLabel(n.type)+'」',n.text,v=>{if(v!==null){n.text=v;el.querySelector('.node-shape').childNodes[0].textContent=v;}});
+}
+
+function selN(id){
+document.querySelectorAll('.flow-node').forEach(el=>el.classList.remove('selected'));
+selNode=id;
+const el=document.querySelector('.flow-node[data-id="'+id+'"]');if(el)el.classList.add('selected');
+updProp();
+}
+
+function delNode(id){
+conns=conns.filter(c=>c.f!==id&&c.t!==id);
+nodes=nodes.filter(n=>n.id!==id);
+const el=document.querySelector('.flow-node[data-id="'+id+'"]');if(el)el.remove();
+updConns();if(selNode===id){selNode=null;updProp();}
+}
+
+function onPDown(e){
+e.stopPropagation();
+const el=e.target.closest('.flow-node');
+pFrom=+el.dataset.id;pFPort=e.target.dataset.port;pConn=true;
+e.target.style.background='#e94560';
+}
+function onPUp(e){
+e.stopPropagation();
+if(!pConn||!pFrom)return;
+const el=e.target.closest('.flow-node'),tid=+el.dataset.id,tp=e.target.dataset.port;
+if(pFrom!==tid)mkConn(pFrom,tid,pFPort,tp);
+pConn=false;pFrom=null;pFPort=null;
+document.querySelectorAll('.port').forEach(p=>p.style.background='');
+}
+
+function mkConn(fid,tid,fp,tp){
+const fn=nodes.find(n=>n.id===fid);
+let label='';
+if(fn.type==='decision'){
+if(fp==='right')label='是';
+else if(fp==='left')label='否';
+else{
+showChoice('判斷分支','這條連接是「是」還是「否」？',ch=>{
+const port=ch==='是'?'right':'left';
+conns=conns.filter(c=>!(c.f===fid&&c.fp===port));
+conns.push({id:nid++,f:fid,t:tid,fp:port,tp:tp||'top',lb:ch});updConns();
+});return;
+}
+}
+conns=conns.filter(c=>!(c.f===fid&&c.fp===(fp||'bottom')&&c.lb===label));
+conns.push({id:nid++,f:fid,t:tid,fp:fp||'bottom',tp:tp||'top',lb:label,hl:false});
+updConns();
+}
+
+function addConn(fid,tid,fp,tp,lb){
+conns.push({id:nid++,f:fid,t:tid,fp:fp||'bottom',tp:tp||'top',lb:lb||'',hl:false});
+}
+
+function updConns(){
+const svg=document.getElementById('svg');
+svg.querySelectorAll('.cp,.ct').forEach(e=>e.remove());
+const cr=document.getElementById('canvas').getBoundingClientRect();
+conns.forEach(c=>{
+const fe=document.querySelector('.flow-node[data-id="'+c.f+'"]');
+const te=document.querySelector('.flow-node[data-id="'+c.t+'"]');
+if(!fe||!te)return;
+const fp=fe.querySelector('.port-'+c.fp)||fe.querySelector('.port-bottom');
+const tp=te.querySelector('.port-'+c.tp)||te.querySelector('.port-top');
+if(!fp||!tp)return;
+const fr=fp.getBoundingClientRect(),tr=tp.getBoundingClientRect();
+const x1=fr.left-cr.left+7,y1=fr.top-cr.top+7,x2=tr.left-cr.left+7,y2=tr.top-cr.top+7;
+const my=(y1+y2)/2;
+let d;
+if(c.fp==='left'||c.fp==='right'){
+const cx=c.fp==='right'?Math.max(x1+60,x2):Math.min(x1-60,x2);
+d='M'+x1+' '+y1+' C'+cx+' '+y1+','+x2+' '+my+','+x2+' '+y2;
+}else{d='M'+x1+' '+y1+' C'+x1+' '+my+','+x2+' '+my+','+x2+' '+y2;}
+const p=document.createElementNS('http://www.w3.org/2000/svg','path');
+p.setAttribute('d',d);p.setAttribute('stroke',c.hl?'#e94560':'#b2bec3');
+p.setAttribute('stroke-width',c.hl?'3':'2');p.setAttribute('fill','none');
+p.setAttribute('marker-end',c.hl?'url(#ahh)':'url(#ah)');p.setAttribute('class','cp');
+svg.appendChild(p);
+if(c.lb){
+const t=document.createElementNS('http://www.w3.org/2000/svg','text');
+const lx=(x1+x2)/2+(c.fp==='right'?12:c.fp==='left'?-12:0);
+t.setAttribute('x',lx);t.setAttribute('y',(y1+y2)/2-6);
+t.setAttribute('fill',c.lb==='是'?'#00b894':'#e17055');
+t.setAttribute('font-size','12');t.setAttribute('font-weight','bold');
+t.setAttribute('text-anchor','middle');t.setAttribute('class','ct');
+t.textContent=c.lb;svg.appendChild(t);
+}
+});
+}
+
+function updProp(){
+const pp=document.getElementById('pp');
+if(!selNode){pp.innerHTML='<p style="color:#8b949e;font-size:11px;">點擊節點查看</p>';return;}
+const n=nodes.find(a=>a.id===selNode);if(!n)return;
+pp.innerHTML='<div style="margin-bottom:6px"><span style="color:#8b949e;font-size:11px">類型：</span><span style="color:#fdcb6e;font-size:12px">'+getLabel(n.type)+'</span></div><div><label style="color:#8b949e;font-size:11px;display:block;margin-bottom:3px">內容：</label><textarea id="pt" rows="2">'+esc(n.text)+'</textarea></div><button onclick="updTxt()" style="margin-top:6px;padding:3px 10px;background:#0984e3;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:11px;">更新</button>';
+}
+window.updTxt=function(){
+if(!selNode)return;const n=nodes.find(a=>a.id===selNode);
+const t=document.getElementById('pt').value;n.text=t;
+const el=document.querySelector('.flow-node[data-id="'+selNode+'"] .node-shape');
+if(el)el.childNodes[0].textContent=t;
+};
+function getLabel(t){return{start:'🟢 開始',end:'🔴 結束',process:'🔷 處理',input:'📥 輸入',output:'📤 輸出',decision:'🔶 判斷'}[t]||t;}
+
+function showModal(title,def,cb){
+const mc=document.getElementById('mc');
+mc.innerHTML='<div class="mo" id="moBg"><div class="md"><h3>'+esc(title)+'</h3><input type="text" id="mi" value="'+esc(def||'')+'"><div class="mb"><button class="bca" id="mca">取消</button><button class="bok" id="mok">確定</button></div></div></div>';
+const inp=document.getElementById('mi');setTimeout(()=>{inp.focus();inp.select();},50);
+inp.onkeydown=e=>{if(e.key==='Enter')doOk();if(e.key==='Escape')doCancel();};
+document.getElementById('mok').onclick=doOk;
+document.getElementById('mca').onclick=doCancel;
+document.getElementById('moBg').onclick=e=>{if(e.target===e.currentTarget)doCancel();};
+function doOk(){const v=inp.value;mc.innerHTML='';cb(v);}
+function doCancel(){mc.innerHTML='';cb(null);}
+}
+
+function showChoice(title,msg,cb){
+const mc=document.getElementById('mc');
+mc.innerHTML='<div class="mo"><div class="md"><h3>'+esc(title)+'</h3><p>'+esc(msg)+'</p><div class="mb"><button class="bno" id="cno">否 No</button><button class="byes" id="cyes">是 Yes</button></div></div></div>';
+document.getElementById('cyes').onclick=()=>{mc.innerHTML='';cb('是');};
+document.getElementById('cno').onclick=()=>{mc.innerHTML='';cb('否');};
+}
+
+function showInput(prompt,cb){
+const mc=document.getElementById('mc');
+mc.innerHTML='<div class="mo"><div class="md"><h3>📥 輸入</h3><p>'+esc(prompt)+'</p><input type="text" id="ri"><div class="mb"><button class="bok" id="riok">確定</button></div></div></div>';
+const inp=document.getElementById('ri');setTimeout(()=>inp.focus(),50);
+inp.onkeydown=e=>{if(e.key==='Enter'){const v=inp.value;mc.innerHTML='';cb(v);}};
+document.getElementById('riok').onclick=()=>{const v=inp.value;mc.innerHTML='';cb(v);};
+}
+
+/* === Demo Menu === */
+function showDemoMenu(){
+const mc=document.getElementById('mc');
+mc.innerHTML='<div class="mo" id="dmBg"><div class="md" style="min-width:360px;"><h3>📖 選擇示範例子</h3><p style="margin-bottom:14px;">請選擇一個流程圖範例載入：</p>'+
+'<button class="demo-btn" data-demo="sequence"><span class="dtag" style="background:#0984e3;">序列</span>計算矩形面積<span class="ddesc">輸入長和寬 → 計算面積 → 輸出結果（無分支）</span></button>'+
+'<button class="demo-btn" data-demo="if"><span class="dtag" style="background:#fdcb6e;color:#2d3436;">IF</span>及格檢查<span class="ddesc">輸入分數 → 如果 ≥ 50 就輸出「及格」（單分支）</span></button>'+
+'<button class="demo-btn" data-demo="ifelse"><span class="dtag" style="background:#e17055;">IF-ELSE</span>帶傘判斷<span class="ddesc">輸入天氣 → 有雨輸出「帶傘」/ 無雨輸出「不用帶傘」（雙分支）</span></button>'+
+'<button class="demo-btn" data-demo="loop"><span class="dtag" style="background:#6c5ce7;">迴圈</span>計算 1+2+...+n<span class="ddesc">輸入 n → 用迴圈累加 → 輸出總和</span></button>'+
+'<div class="mb" style="margin-top:10px;"><button class="bca" id="dmClose">取消</button></div></div></div>';
+document.getElementById('dmBg').onclick=e=>{if(e.target===e.currentTarget)mc.innerHTML='';};
+document.getElementById('dmClose').onclick=()=>{mc.innerHTML='';};
+mc.querySelectorAll('.demo-btn').forEach(b=>{
+b.onclick=()=>{mc.innerHTML='';loadDemo(b.dataset.demo);};
+});
+}
+
+function logC(t,c='info'){const con=document.getElementById('con'),d=document.createElement('div');d.className='l '+c;d.textContent=t;con.appendChild(d);con.scrollTop=con.scrollHeight;}
+function clrC(){document.getElementById('con').innerHTML='';}
+
+function updVars(){
+const vp=document.getElementById('vp'),ks=Object.keys(ex.vars);
+if(!ks.length){vp.innerHTML='<p style="color:#8b949e;font-size:11px;">暫無變量</p>';return;}
+vp.innerHTML=ks.map(k=>'<div class="vi"><span class="vn">'+esc(k)+'</span><span class="vv">'+esc(String(ex.vars[k]))+'</span></div>').join('');
+}
+
+function hlNode(id){document.querySelectorAll('.flow-node').forEach(e=>e.classList.remove('node-highlight'));if(id){const e=document.querySelector('.flow-node[data-id="'+id+'"]');if(e)e.classList.add('node-highlight');}}
+function clrHL(){document.querySelectorAll('.flow-node').forEach(e=>e.classList.remove('node-highlight'));conns.forEach(c=>c.hl=false);updConns();}
+
+function safeEval(expr,vars){
+let p=expr.trim();
+if(p.startsWith('"')&&p.endsWith('"'))return p.slice(1,-1);
+if(p.startsWith("'")&&p.endsWith("'"))return p.slice(1,-1);
+p=p.replace(/＝＝/g,'==').replace(/！＝/g,'!=').replace(/＞＝/g,'>=').replace(/＜＝/g,'<=').replace(/＞/g,'>').replace(/＜/g,'<').replace(/及|和|AND/gi,'&&').replace(/或|OR/gi,'||').replace(/MOD/gi,'%').replace(/不等於/g,'!=').replace(/等於/g,'==').replace(/大於/g,'>').replace(/小於/g,'<');
+const vn=Object.keys(vars),vv=Object.values(vars);
+try{return new Function(...vn,'return('+p+');')(...vv);}
+catch(e){throw new Error('表達式錯誤: '+expr);}
+}
+
+function doProcess(txt,vars){
+const parts=txt.split(';');
+for(const part of parts){
+const m=part.trim().match(/^\s*([a-zA-Z_]\w*)\s*[=←]\s*(.+)$/);
+if(m)vars[m[1]]=safeEval(m[2].trim(),vars);
+}
+}
+
+function getInputVar(txt){
+const m=txt.match(/(?:輸入|讀入|INPUT|input)\s+([a-zA-Z_]\w*)/i);
+if(m)return m[1];
+const m2=txt.trim().match(/^([a-zA-Z_]\w*)$/);
+return m2?m2[1]:null;
+}
+
+function doOutput(txt,vars){
+const m=txt.match(/(?:輸出|顯示|OUTPUT|PRINT|print)\s+(.+)/i);
+const expr=m?m[1]:txt;
+try{return safeEval(expr,vars);}catch(e){return expr;}
+}
+
+function doDecision(txt,vars){
+let e=txt.replace(/[?？]$/,'').trim();
+try{return!!safeEval(e,vars);}catch(er){throw new Error('判斷條件錯誤: '+txt);}
+}
+
+function nextNodes(id,lb){
+return conns.filter(c=>c.f===id&&(!lb||c.lb===lb)).map(c=>nodes.find(n=>n.id===c.t)).filter(Boolean);
+}
+
+function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
+
+async function runFlow(stepping){
+resetExec();
+const s=nodes.find(n=>n.type==='start');
+if(!s){logC('❌ 找不到「開始」節點！','error');return;}
+ex.run=true;ex.step=stepping;
+logC(stepping?'⏭ 開始逐步執行...':'▶ 開始執行...','success');
+await execNode(s);
+}
+
+async function doStep(){
+if(!ex.run){await runFlow(true);return;}
+if(stepR){const r=stepR;stepR=null;r();}
+}
+
+async function execNode(node){
+let cur=node,max=10000;
+while(cur&&ex.run&&max-->0){
+ex.cur=cur.id;hlNode(cur.id);
+if(ex.step){await new Promise(r=>{stepR=r;});}else{await sleep(350);}
+if(!ex.run)break;
+let next=null;
+try{
+switch(cur.type){
+case'start':logC('🟢 開始','info');next=(nextNodes(cur.id))[0];break;
+case'end':logC('🔴 結束','info');next=null;break;
+case'process':
+doProcess(cur.text,ex.vars);logC('🔷 '+cur.text,'info');updVars();
+next=(nextNodes(cur.id))[0];break;
+case'input':{
+const vn=getInputVar(cur.text);
+if(!vn){logC('❌ 輸入格式錯誤: '+cur.text,'error');ex.run=false;break;}
+const val=await new Promise(r=>showInput('請輸入 '+vn+' 的值：',r));
+const num=Number(val);ex.vars[vn]=isNaN(num)?val:num;
+logC('📥 '+vn+' = '+ex.vars[vn],'output');updVars();
+next=(nextNodes(cur.id))[0];break;}
+case'output':{
+const res=doOutput(cur.text,ex.vars);
+logC('📤 '+res,'output');next=(nextNodes(cur.id))[0];break;}
+case'decision':{
+const cond=doDecision(cur.text,ex.vars);
+logC('🔶 '+cur.text+' → '+(cond?'是':'否'),'info');
+const yn=nextNodes(cur.id,cond?'是':'否');
+next=yn[0]||null;
+if(next){conns.forEach(c=>c.hl=false);const cc=conns.find(c=>c.f===cur.id&&c.t===next.id);if(cc)cc.hl=true;updConns();}
+break;}
+}
+}catch(e){logC('❌ '+e.message,'error');ex.run=false;break;}
+cur=next;
+}
+if(max<=0)logC('❌ 可能出現無限迴圈（超過10000步）！','error');
+ex.run=false;clrHL();logC('⏹ 執行完畢。','success');
+}
+
+function resetExec(){
+ex={run:false,step:false,vars:{},cur:null};stepR=null;
+clrHL();clrC();updVars();document.getElementById('mc').innerHTML='';
+}
+
+function clearAll(){
+resetExec();nodes=[];conns=[];
+document.querySelectorAll('.flow-node').forEach(e=>e.remove());
+updConns();selNode=null;updProp();logC('🧹 已清空。','info');
+}
+
+/* ============ DEMO LOADERS ============ */
+function loadDemo(type){
+clearAll();clrC();
+switch(type){
+case'sequence':loadDemoSequence();break;
+case'if':loadDemoIf();break;
+case'ifelse':loadDemoIfElse();break;
+case'loop':loadDemoLoop();break;
+default:loadDemoLoop();
+}
+setTimeout(updConns,50);
+}
+
+// 示範1：序列 — 計算矩形面積
+function loadDemoSequence(){
+const s=mkNode('start',280,20);
+const i1=mkNode('input',260,110);setTxt(i1,'輸入 length');
+const i2=mkNode('input',260,200);setTxt(i2,'輸入 width');
+const p1=mkNode('process',240,290);setTxt(p1,'area = length * width');
+const o1=mkNode('output',260,385);setTxt(o1,'輸出 area');
+const en=mkNode('end',290,480);
+addConn(s.id,i1.id,'bottom','top');
+addConn(i1.id,i2.id,'bottom','top');
+addConn(i2.id,p1.id,'bottom','top');
+addConn(p1.id,o1.id,'bottom','top');
+addConn(o1.id,en.id,'bottom','top');
+updConns();
+logC('📖 示範：序列 — 計算矩形面積','success');
+logC('這是最基本的「序列」結構：所有步驟按順序執行，沒有分支。','info');
+logC('按「▶ 執行」，輸入長度和寬度即可計算面積。','info');
+}
+
+// 示範2：IF（單分支）— 及格檢查
+function loadDemoIf(){
+const s=mkNode('start',280,20);
+const i1=mkNode('input',260,110);setTxt(i1,'輸入 score');
+const dc=mkNode('decision',255,220);setTxt(dc,'score >= 50');
+const o1=mkNode('output',460,210);setTxt(o1,'輸出 "及格"');
+const en=mkNode('end',290,400);
+addConn(s.id,i1.id,'bottom','top');
+addConn(i1.id,dc.id,'bottom','top');
+addConn(dc.id,o1.id,'right','top','是');
+addConn(dc.id,en.id,'left','top','否');
+addConn(o1.id,en.id,'bottom','top');
+updConns();
+logC('📖 示範：IF（單分支）— 及格檢查','success');
+logC('這是「IF」結構：條件成立時才執行某動作，否則跳過。','info');
+logC('試試輸入 60（應顯示「及格」）或 40（直接結束，無輸出）。','info');
+}
+
+// 示範3：IF-ELSE（雙分支）— 帶傘判斷
+function loadDemoIfElse(){
+const s=mkNode('start',300,20);
+const i1=mkNode('input',275,110);setTxt(i1,'輸入 hasRain');
+const dc=mkNode('decision',275,230);setTxt(dc,'hasRain == 1');
+const o1=mkNode('output',480,220);setTxt(o1,'輸出 "請帶傘"');
+const o2=mkNode('output',70,220);setTxt(o2,'輸出 "不用帶傘"');
+const en=mkNode('end',310,400);
+addConn(s.id,i1.id,'bottom','top');
+addConn(i1.id,dc.id,'bottom','top');
+addConn(dc.id,o1.id,'right','top','是');
+addConn(dc.id,o2.id,'left','top','否');
+addConn(o1.id,en.id,'bottom','top');
+addConn(o2.id,en.id,'bottom','top');
+updConns();
+logC('📖 示範：IF-ELSE（雙分支）— 帶傘判斷','success');
+logC('這是「IF-ELSE」結構：條件成立走一邊，不成立走另一邊。','info');
+logC('輸入 1 代表有雨（顯示「請帶傘」），輸入 0 代表無雨（顯示「不用帶傘」）。','info');
+}
+
+// 示範4：迴圈 — 計算 1+2+...+n
+function loadDemoLoop(){
+const s=mkNode('start',280,20);
+const i1=mkNode('input',270,110);setTxt(i1,'輸入 n');
+const p1=mkNode('process',250,200);setTxt(p1,'sum = 0; i = 1');
+const dc=mkNode('decision',255,310);setTxt(dc,'i <= n');
+const p2=mkNode('process',480,300);setTxt(p2,'sum = sum + i; i = i + 1');
+const o1=mkNode('output',265,440);setTxt(o1,'輸出 sum');
+const en=mkNode('end',290,535);
+addConn(s.id,i1.id,'bottom','top');
+addConn(i1.id,p1.id,'bottom','top');
+addConn(p1.id,dc.id,'bottom','top');
+addConn(dc.id,p2.id,'right','top','是');
+addConn(dc.id,o1.id,'bottom','top','否');
+addConn(p2.id,dc.id,'bottom','right');
+addConn(o1.id,en.id,'bottom','top');
+updConns();
+logC('📖 示範：迴圈 — 計算 1+2+...+n','success');
+logC('這是「迴圈」結構：重複執行直到條件不成立。','info');
+logC('按「▶ 執行」，輸入 n 的值即可看到累加結果。','info');
+}
+
+setTimeout(()=>loadDemo('sequence'),300);
+</script>
+</body>
+</html>
